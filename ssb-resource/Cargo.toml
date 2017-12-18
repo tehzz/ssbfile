@@ -1,0 +1,7 @@
+[package]
+name = "ssb-resource"
+version = "0.1.0"
+authors = ["tehz"]
+
+[dependencies]
+vpk0 = {git = "https://github.com/tehzz/vpk0.git" }

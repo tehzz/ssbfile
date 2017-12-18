@@ -1,0 +1,9 @@
+[package]
+name = "ssbfile"
+version = "0.1.0"
+authors = ["tehz"]
+
+[dependencies]
+ssb-resource = { path = "ssb-resource" } 
+
+[workspace]
