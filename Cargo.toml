@@ -5,5 +5,7 @@ authors = ["tehz"]
 
 [dependencies]
 ssb-resource = { path = "ssb-resource" } 
+clap = "2.29.0"
+failure = "0.1.1"
 
 [workspace]

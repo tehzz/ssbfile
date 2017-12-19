@@ -1,6 +1,7 @@
+#![allow(dead_code)]
+
 use byteorder::{ByteOrder, BE};
 use std::str;
-
 
 /// The errors that can be caused from attempting to parse the N64 rom for its header
 #[derive(Debug, Fail)]
