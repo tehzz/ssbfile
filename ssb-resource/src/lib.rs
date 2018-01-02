@@ -2,6 +2,8 @@ extern crate byteorder;
 #[macro_use] extern crate failure;
 
 mod rom_info;
+mod ssb;
+mod export;
 
 #[cfg(test)]
 mod tests {

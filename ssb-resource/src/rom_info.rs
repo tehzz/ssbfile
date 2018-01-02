@@ -18,17 +18,8 @@ pub enum N64ParseError {
     UnknownCountry(char),
 }
 
-// move this enum to a module that deals more closely with editing the ssb64 ROM
-/*
-pub enum SSB64Version {
-    NtscU,
-    NtscJ,
-    PalE,
-    PalA,
-}
-*/
 /// A `struct` that contains "indentifying information" about an N64 ROM. 
-struct N64Header<'rom> {
+pub struct N64Header<'rom> {
     crc1: u32,
     crc2: u32,
     name: &'rom str,
@@ -40,7 +31,7 @@ struct N64Header<'rom> {
 impl<'rom> N64Header<'rom> {
     /// Parse a byte slice of a big-endian ROM image into an N64Header struct. Note that this function
     /// assumes that the slice starts at the beginning of the ROM.
-    fn from_rom(rom: &'rom [u8]) -> Result<Self, N64ParseError> {
+    pub fn from_rom(rom: &'rom [u8]) -> Result<Self, N64ParseError> {
         if rom.len() < 0x40 { return Err( N64ParseError::ImageTooSmall( rom.len() ) ) }
 
         let crc1 = BE::read_u32(&rom[0x10..0x14]);
@@ -56,6 +47,9 @@ impl<'rom> N64Header<'rom> {
         Ok(N64Header {
             crc1, crc2, name, game_code, format, country_code, version
         })
+    }
+    pub fn get_game_code(&self) -> &str {
+        self.game_code
     }
 }
 
@@ -135,26 +129,19 @@ impl N64CountryCode {
         }
     }
 }
-/*     
-    65 0x41 'A' (not documented, generic NTSC?)
-    66 0x42 'B' "Brazilian"
-    67 0x43 'C' "Chinese"
-    68 0x44 'D' "German"
-    69 0x45 'E' "North America"
-    70 0x46 'F' "French"
-    71 0x47 'G': Gateway 64 (NTSC)
-    72 0x48 'H' "Dutch"
-    73 0x49 'I' "Italian"
-    74 0x4A 'J' "Japanese"
-    75 0x4B 'K' "Korean"
-    76 0x4C 'L': Gateway 64 (PAL)
-    78 0x4E 'N' "Canadian"
-    80 0x50 'P' "European (basic spec.)"
-    83 0x53 'S' "Spanish"
-    85 0x55 'U' "Australian"
-    87 0x57 'W' "Scandinavian"
-    88 0x58 'X' "Others"
-    89 0x59 'Y' "Others"
-    90 0x5A 'Z' "Others"
-*/
 // Information: http://www.emutalk.net/threads/54892-File-spec-for-N64-ROM-formats?p=451757&viewfull=1#post451757
+
+/// Helper function to extract an 32-bit value from the immediate fields
+/// of two MIPS instructions
+pub fn extract_asm_immediate(upper: u32, lower: u32) -> i32 {
+    let u = (upper as i16 as i32) << 16;
+    
+    // check for ori (0x20..), as that's the only relevant unsigned opcode
+    let l = if (lower >> 24) == 0x20 {
+        (lower & 0xFFFF) as i32
+    } else {
+        (lower & 0xFFFF) as i16 as i32
+    };
+    
+    u + l
+}
