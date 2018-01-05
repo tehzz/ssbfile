@@ -25,6 +25,7 @@ pub fn export_file(rom: &[u8], index: u32) -> Result<Vec<u8>, ExportError>
 {
     // process the rom into a Ssb64 struct
     let ssb = Ssb64::from_rom(rom)?;
+    let (entry, ptr) = ssb.get_res_tbl_entry(rom, index)?;
 
     unimplemented!()
 }

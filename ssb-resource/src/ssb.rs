@@ -6,7 +6,9 @@ pub enum Ssb64Error {
     #[fail(display = "Unable to read basic N64 ROM information")]
     N64ParseError( #[cause] N64ParseError),
     #[fail(display = "Gamecode <{}> is not a known version of SSB64", _0)]
-    UnknownVersion(String)
+    UnknownVersion(String),
+    #[fail(display = "Requested file id <{}> was higher than total files <{}>", _0, _1)]
+    IllegalFile(u32, u32),
 }
 
 impl From<N64ParseError> for Ssb64Error {
@@ -55,35 +57,39 @@ impl Ssb64Version {
     }
 }
 
-/// This struct holds a pointer to the ROM data slice, and extracted information from the rom
+/// This struct holds extracted information from a rom byte slice
 #[derive(Debug)]
-pub struct Ssb64<'rom> {
+pub struct Ssb64 {
     version: Ssb64Version,
-    rom: &'rom [u8],
-    resource_table: ResourceTbl<'rom>, 
+    resource_table: ResourceTbl, 
 }
 
-impl<'rom> Ssb64<'rom> {
-    pub fn from_rom(rom: &'rom [u8]) -> Result<Self, Ssb64Error> {
+impl Ssb64 {
+    pub fn from_rom(rom: & [u8]) -> Result<Self, Ssb64Error> {
         let version = Ssb64Version::from_rom(rom)?;
         let resource_table = ResourceTbl::from_rom(rom, version);
 
-        Ok(Ssb64{version, rom, resource_table})
+        Ok(Ssb64{version, resource_table})
+    }
+    pub fn get_res_tbl_entry(&self, rom: &[u8], entry: u32) 
+        -> Result<(ResTblEntry, usize), Ssb64Error>
+    {
+        self.resource_table.get_entry(rom, entry)
     }
 }
 
 /// Struct to hold a pointer to the resource file table data
 #[derive(Debug)]
-struct ResourceTbl<'rom> {
+pub struct ResourceTbl {
     entries_count: u32,
     start: u32,
-    raw: &'rom [u8], // should this hold a mutable slice? or should the table be parsed into objects?
-    eof: &'rom [u8],
+    eof: [u8; 12],
     ptr_to_next_tbl: u32,
+    end: u32,
 }
 
-impl<'rom> ResourceTbl<'rom> {
-    fn from_rom(rom: &'rom [u8], version: Ssb64Version) -> Self {
+impl ResourceTbl {
+    fn from_rom(rom: &[u8], version: Ssb64Version) -> Self {
         // calculate or use size to create new slice of just the resource table
         let (ptr_to_table_start, (size_upper_instruct, size_lower_instruct)) = version.get_table_offsets();
         let ptr_to_table_start  = ptr_to_table_start as usize;
@@ -97,19 +103,84 @@ impl<'rom> ResourceTbl<'rom> {
 
             extract_asm_immediate(upper, lower) as u32
         };
-        let end = (start + 12 * entries_count) as usize;
+        let entries_end = (start + 12 * entries_count) as usize;
 
-        let raw = &rom[start as usize..end];
         // there is one final entry at the end of the table that points to the start
         // of the next table (for images and sprites) 
-        let eof = &rom[end..end+12];
+        let eof = rom[entries_end..entries_end+12]
+            .iter()
+            .enumerate()
+            .fold([0u8; 12], | mut arr, (i, b) | { arr[i] = *b; arr });
         let ptr_to_next_tbl = BE::read_u32(&eof[0..4]);
+        let end = (entries_end + 12) as u32;
 
-        ResourceTbl{entries_count, start, raw, eof, ptr_to_next_tbl}
+        ResourceTbl{entries_count, start, eof, ptr_to_next_tbl, end}
     }
 
-    /// Return some sort of entry object that has the table info, plus pointer to file data?
-    fn get_entry(id: u32) {
-        unimplemented!()
+    /// Return a tupple containing a ResTblEntry struct and a pointer to that entry's data
+    /// in the rom_data byte slice
+    fn get_entry(&self, rom_data: &[u8], id: u32) -> Result<(ResTblEntry, usize), Ssb64Error> 
+    {
+        let &ResourceTbl{start, end, entries_count, ..} = self;
+        let start = start as usize; let end = end as usize;
+
+        if id > entries_count { 
+            return Err(Ssb64Error::IllegalFile(id, entries_count))
+        }
+
+        let id = id as usize;
+        let table_data = &rom_data[start..(end-12)];
+        let entry_data = unsafe {
+            &*(table_data[id*12..(id+1)*12].as_ptr() as *const [u8; 12])
+        };
+        let entry = ResTblEntry::from(entry_data);
+        
+        Ok( (entry, entry.calc_ptr(start)) )
+    }
+}
+
+/// The resource file table information about data
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ResTblEntry {
+    compressed: bool,
+    offset: u32,
+    internal_ptr_list: Option<u32>,
+    external_ptr_list: Option<u32>,
+    compressed_size: u32,
+    decompressed_size: u32,
+}
+
+impl ResTblEntry {
+    /// Calculate the ROM pointer for a resource table entry
+    #[inline]
+    fn calc_ptr(&self, table_start: usize) -> usize {
+        let &Self{offset, ..} = self;
+        let offset = offset as usize;
+        table_start + offset
+    }
+}
+
+impl<'a> From<&'a [u8; 12]> for ResTblEntry {
+    fn from(arr: &[u8; 12]) -> Self {
+        let (offset, compressed) = {
+            let word = BE::read_u32(&arr[0..4]);
+            ((word & 0x7FFFFFFF), (word & 0x80000000) != 0)
+        };
+        let internal = BE::read_u16(&arr[4..6]);
+        let internal_ptr_list = if internal == 0xFFFF 
+            { None } else {Some((internal as u32) << 2)};
+
+        let external = BE::read_u16(&arr[8..10]);
+        let external_ptr_list = if external == 0xFFFF 
+            { None } else {Some((external as u32) << 2)};
+        
+        let compressed_size   = (BE::read_u16(&arr[6..8]) as u32) << 2;
+        let decompressed_size = (BE::read_u16(&arr[10..12]) as u32) << 2;
+
+        ResTblEntry {
+            compressed, offset, 
+            internal_ptr_list, external_ptr_list, 
+            compressed_size, decompressed_size
+        }
     }
 }
