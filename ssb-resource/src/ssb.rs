@@ -151,12 +151,23 @@ pub struct ResTblEntry {
 }
 
 impl ResTblEntry {
-    /// Calculate the ROM pointer for a resource table entry
+    /// Calculate the ROM pointer for a resource table entry, based on the table start
+    /// offset `table_start`
     #[inline]
     fn calc_ptr(&self, table_start: usize) -> usize {
         let &Self{offset, ..} = self;
         let offset = offset as usize;
         table_start + offset
+    }
+    /// Check if the associated data for this entry is vpk0 compressed
+    #[inline]
+    pub fn is_compressed(&self) -> bool {
+        self.compressed
+    }
+    /// Get a tupple containing the compressed size and decompressed size
+    /// of the associated data for this table entry
+    pub fn get_size(&self) -> (u32, u32) {
+        (self.compressed_size, self.decompressed_size)
     }
 }
 
