@@ -49,6 +49,9 @@ fn export_file(rom: &[u8], index: u32, decompress: bool)
     Ok(data)
 }
 
+/// Export the external pointer nodes of file `index` from ROM slice `&[u8] rom`
+//fn export_externals(rom: &[u8], index: u32)
+
 /// Export file number `index` from a `&[u8] ROM` buffer.
 /// If `decompress` is `true`, the exported file is decompressed from its raw VPK0 data;
 /// otherwise, the raw data is returned (which could be either the actual binary file, or

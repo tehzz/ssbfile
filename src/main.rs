@@ -1,8 +1,10 @@
 extern crate clap;
 #[macro_use] extern crate failure;
+extern crate ssb_resource;
 
 use clap::{App, Arg, SubCommand};
 use failure::{Error};
+use ssb_resource::{export};
 
 fn main() {
     if let Err(ref e) = run() {

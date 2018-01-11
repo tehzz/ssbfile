@@ -4,10 +4,9 @@ extern crate vpk0;
 
 mod rom_info;
 mod ssb;
-mod export;
+pub mod export;
 
 use export::{ExportError};
-pub use export::{file};
 
 #[derive(Fail, Debug)]
 pub enum ResError {
