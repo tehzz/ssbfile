@@ -59,7 +59,17 @@ fn run() -> Result<(), Error> {
 }
 
 fn export(matches: &ArgMatches) -> Result<(), Error> {
-    let rom_path = matches.value_of("rom")
+    let rom_path = matches.value_of("rom").unwrap();
+    let file_idx: u32 = if let Some(idx) = matches.value_of("file-index") {
+        if idx.len() > 2 && &idx[0..2] == "0x" {
+            u32::from_str_radix(&idx[2..], 16)?
+        } else { 
+            u32::from_str_radix(idx, 10)?
+        }
+    } else { bail!("No file index provided") };
+
+    println!("{} - {}", rom_path, file_idx);
+
     Ok(())
 }
 
