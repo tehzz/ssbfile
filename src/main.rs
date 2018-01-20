@@ -2,7 +2,7 @@ extern crate clap;
 #[macro_use] extern crate failure;
 extern crate ssb_resource;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::{Error};
 use ssb_resource::{export};
 
@@ -25,13 +25,41 @@ fn main() {
         ::std::process::exit(1);
     }
 }
+enum Mode {
+    Export,
+    Import,
+    Add,
+}
 
 fn run() -> Result<(), Error> {
+    const EXPORT: &'static str = "export";
+    const IMPORT: &'static str = "import";
+    const ADD: &'static str    = "add";
+
     let matches = cli().get_matches();
 
     println!("Hello, world!");
     println!("{:?}", matches);
 
+    let mode = match matches.subcommand_name() {
+        Some(EXPORT) => Mode::Export,
+        Some(IMPORT) => Mode::Import,
+        Some(ADD)    => Mode::Add,
+        Some(unk)    => bail!("Unknown subcommand <{}>", unk),
+        None         => bail!("No subcommand passed to application"),
+    };
+
+    match mode {
+        Mode::Export => export(matches.subcommand_matches(EXPORT).unwrap())?,
+        Mode::Import => unimplemented!(),
+        Mode::Add    => unimplemented!(),
+    }
+
+    Ok(())
+}
+
+fn export(matches: &ArgMatches) -> Result<(), Error> {
+    let rom_path = matches.value_of("rom")
     Ok(())
 }
 
