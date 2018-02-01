@@ -1,10 +1,13 @@
 extern crate clap;
+extern crate path_abs;
 #[macro_use] extern crate failure;
 extern crate ssb_resource;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::{Error};
 use ssb_resource::{export};
+use path_abs::{PathAbs};
+use std::io::{Read};
 
 fn main() {
     if let Err(ref e) = run() {
@@ -68,7 +71,13 @@ fn export(matches: &ArgMatches) -> Result<(), Error> {
         }
     } else { bail!("No file index provided") };
 
+    let mut rom_file = PathAbs::new(&rom_path)?.into_file()?.read()?;
+    let mut rom = Vec::new();
+
+    rom_file.read_to_end(&mut rom)?;
+
     println!("{} - {}", rom_path, file_idx);
+    println!("rom size: {}", rom.len());
 
     Ok(())
 }
