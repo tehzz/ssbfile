@@ -1,5 +1,6 @@
 use byteorder::{BE, ByteOrder};
 use rom_info::{N64Header, N64ParseError, extract_asm_immediate};
+use std::collections::BTreeMap;
 
 #[derive(Fail, Debug)]
 pub enum Ssb64Error {
@@ -194,4 +195,58 @@ impl<'a> From<&'a [u8; 12]> for ResTblEntry {
             compressed_size, decompressed_size
         }
     }
+}
+
+/// An output struct that holds all of the important, extra information about a resource file
+/// If `compress` is `true`, the file will be compressed.
+/// The two collections of pointers--`internal_ptrs` and `external_ptrs` are 
+/// lists of either offsets (internal) or an offset and file pair (external)
+/// to "resource file pointer-ify" 
+pub struct ResFileInfo {
+    compress: bool,
+    internal_ptrs: Option<Vec<u32>>,
+    external_ptrs: Option<BTreeMap<u32, u16>>,
+}
+
+impl ResFileInfo {
+    fn from_ResTblEntry(entry: ResTblEntry, file: &[u8], externals: Option<&[u16]>) 
+    -> Self
+    {
+        let compress      = entry.compressed;
+        let internal_ptrs = entry.internal_ptr_list.map(|v| collect_ptr_list(v as usize, file));
+        let external_ptrs = entry.external_ptr_list
+            .map(|v| {
+                let ptrs  = collect_ptr_list(v as usize, file);
+                // check for externals without unwrapping
+                let f_idx = externals.unwrap(); 
+                // check that the ptrs.len() == f_idx.len()
+                let iter = ptrs.iter().zip(f_idx.iter());
+                let mut map = BTreeMap::new();
+                for (ptr, file) in iter {
+                    map.insert(*ptr, *file);
+                }
+                
+                map
+            });
+
+        ResFileInfo{ compress, internal_ptrs, external_ptrs }
+    }
+}
+/// Create a `Vec` containing offsets to the pointers in the `file` buffer
+/// So, collect pointers to "resource file" pointer, without touching the 
+fn collect_ptr_list(start: usize, file: &[u8]) -> Vec<u32> {
+    let length = file.len();    //TODO: use for error checking... 
+    let mut cur = start;
+    let mut output = vec![start as u32];
+    loop {
+        let next = BE::read_u16(&file[cur..cur+2]);
+        if next == 0xFFFF { 
+            break
+        }
+
+        cur = (next as usize) << 2;
+        output.push(cur as u32);
+    }
+
+    output
 }
