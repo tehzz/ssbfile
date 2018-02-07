@@ -77,6 +77,11 @@ impl Ssb64 {
     {
         self.resource_table.get_entry(rom, entry)
     }
+    pub fn get_res_tbl_includes(&self, rom: &[u8], entry: u32)
+        -> Result<Option<Vec<u16>>, Ssb64Error>
+    {
+        self.resource_table.get_external_files(rom, entry)
+    }
 }
 
 /// Struct to hold a pointer to the resource file table data
@@ -137,6 +142,31 @@ impl ResourceTbl {
         let entry = ResTblEntry::from(entry_data);
         
         Ok( (entry, entry.calc_ptr(start)) )
+    }
+    /// Get a `Option<Vec>` containing the external files that file `id` needs, if
+    /// that file requires any external files
+    pub fn get_external_files(&self, rom: &[u8], id: u32) 
+        -> Result<Option<Vec<u16>>, Ssb64Error>
+    {
+        let (file1, file1_start) = self.get_entry(rom, id)?;
+        if file1.external_ptr_list.is_none() {
+            return Ok(None)
+        }
+
+        let req_start = file1_start + file1.compressed_size as usize;
+        let req_byte_len = match self.get_entry(rom, id+1) {
+            Ok( (_, file2_start) ) => file2_start - req_start,
+            Err(Ssb64Error::IllegalFile(_,_)) => req_start - self.ptr_to_next_tbl as usize,
+            Err(err) => return Err(err)
+        };
+        let req_end = req_start + req_byte_len;
+
+        let reqs = &rom[req_start..req_end];
+        // TODO: Size check reqs.len() to ensure 16-bit aligned
+        let mut output: Vec<u16> = Vec::with_capacity(req_byte_len / 2);
+        BE::read_u16_into(reqs, &mut output);
+
+        Ok(Some(output))
     }
 }
 
@@ -202,6 +232,7 @@ impl<'a> From<&'a [u8; 12]> for ResTblEntry {
 /// The two collections of pointers--`internal_ptrs` and `external_ptrs` are 
 /// lists of either offsets (internal) or an offset and file pair (external)
 /// to "resource file pointer-ify" 
+#[derive(Debug)]
 pub struct ResFileInfo {
     compress: bool,
     internal_ptrs: Option<Vec<u32>>,
@@ -209,7 +240,7 @@ pub struct ResFileInfo {
 }
 
 impl ResFileInfo {
-    fn from_ResTblEntry(entry: ResTblEntry, file: &[u8], externals: Option<&[u16]>) 
+    pub fn from_tbl_entry(entry: &ResTblEntry, file: &[u8], externals: Option<&[u16]>) 
     -> Self
     {
         let compress      = entry.compressed;
@@ -217,9 +248,9 @@ impl ResFileInfo {
         let external_ptrs = entry.external_ptr_list
             .map(|v| {
                 let ptrs  = collect_ptr_list(v as usize, file);
-                // check for externals without unwrapping
+                //TODO: check for externals without unwrapping
                 let f_idx = externals.unwrap(); 
-                // check that the ptrs.len() == f_idx.len()
+                //TODO: check that the ptrs.len() == f_idx.len()
                 let iter = ptrs.iter().zip(f_idx.iter());
                 let mut map = BTreeMap::new();
                 for (ptr, file) in iter {
@@ -234,7 +265,7 @@ impl ResFileInfo {
 }
 /// Create a `Vec` containing offsets to the pointers in the `file` buffer
 /// So, collect pointers to "resource file" pointer, without touching the 
-fn collect_ptr_list(start: usize, file: &[u8]) -> Vec<u32> {
+pub fn collect_ptr_list(start: usize, file: &[u8]) -> Vec<u32> {
     let length = file.len();    //TODO: use for error checking... 
     let mut cur = start;
     let mut output = vec![start as u32];

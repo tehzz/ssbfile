@@ -1,12 +1,14 @@
 /* This file will have the functions need to export a file or an included files list from an u32 index
  * into the ssb64 resource table
- * Basic idea:
- *  export_file(index: u32) -> Result<Vec<u8>, ExportError>
- *  export_includes(index: u32) -> Result<Vec<u8>, ExportError>
- * maybe there should be only one underlying function...? 
-*/
+ * Change to
+ *  both(file_index: u32, rom: &[u8]) <- convert interal pointers only, or not?
+ *  file()
+ *  includes()
+ *  raw_file()
+ *  raw_includes()
+**/
 use std::io::Cursor;
-use ssb::{Ssb64, Ssb64Error};
+use ssb::{Ssb64, Ssb64Error, ResTblEntry, ResFileInfo};
 use vpk0::{self, VpkError};
 use ResError;
 
@@ -27,9 +29,10 @@ impl From<VpkError> for ExportError {
     fn from(e: VpkError) -> Self { ExportError::VpkDecode(e) }
 }
 
-/// The real function that exports the file data from a ROM byte slice
-fn export_file(rom: &[u8], index: u32, decompress: bool) 
-    -> Result<Vec<u8>, ExportError> 
+/// Get an `Ssb64` struct with the file table, 
+/// and file `index`'s data and its `ResTblEntry` from a buffer of the ROM data
+fn get_triple(rom: &[u8], index: u32, decompress: bool) 
+    -> Result<(Ssb64, Vec<u8>, ResTblEntry), ExportError> 
 {
     // process the rom into a Ssb64 struct
     let ssb = Ssb64::from_rom(rom)?;
@@ -46,11 +49,19 @@ fn export_file(rom: &[u8], index: u32, decompress: bool)
         raw_data.to_vec()
     };
 
-    Ok(data)
+    Ok((ssb, data, entry))
 }
 
-/// Export the external pointer nodes of file `index` from ROM slice `&[u8] rom`
-//fn export_externals(rom: &[u8], index: u32)
+/// Export id `entry`'s data and  information from a `&[u8]` SSB64 ROM buffer
+pub fn file_and_info(rom: &[u8], entry: u32, decompress: bool) 
+    -> Result<(Vec<u8>, ResFileInfo), ExportError>
+{
+    let (ssb, file_data, tbl_entry) = get_triple(rom, entry, decompress)?;
+    let req_files = ssb.get_res_tbl_includes(rom, entry)?;
+    let file_info = ResFileInfo::from_tbl_entry(&tbl_entry, &file_data, req_files.as_ref().map(|v| &v[..]));
+
+    Ok((file_data, file_info))
+}
 
 /// Export file number `index` from a `&[u8] ROM` buffer.
 /// If `decompress` is `true`, the exported file is decompressed from its raw VPK0 data;
@@ -59,5 +70,7 @@ fn export_file(rom: &[u8], index: u32, decompress: bool)
 pub fn file(rom: &[u8], index: u32, decompress: bool)
     -> Result<Vec<u8>, ResError>
 {
-    export_file(rom, index, decompress).map_err(|e| e.into())
+    get_triple(rom, index, decompress)
+        .map(|(_, d, _)| d)
+        .map_err(|e| e.into())
 }
