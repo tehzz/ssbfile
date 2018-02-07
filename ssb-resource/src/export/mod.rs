@@ -53,10 +53,10 @@ fn get_triple(rom: &[u8], index: u32, decompress: bool)
 }
 
 /// Export id `entry`'s data and  information from a `&[u8]` SSB64 ROM buffer
-pub fn file_and_info(rom: &[u8], entry: u32, decompress: bool) 
+fn get_file_and_info(rom: &[u8], entry: u32) 
     -> Result<(Vec<u8>, ResFileInfo), ExportError>
 {
-    let (ssb, file_data, tbl_entry) = get_triple(rom, entry, decompress)?;
+    let (ssb, file_data, tbl_entry) = get_triple(rom, entry, true)?;
     let req_files = ssb.get_res_tbl_includes(rom, entry)?;
     let file_info = ResFileInfo::from_tbl_entry(&tbl_entry, &file_data, req_files.as_ref().map(|v| &v[..]));
 
@@ -72,5 +72,14 @@ pub fn file(rom: &[u8], index: u32, decompress: bool)
 {
     get_triple(rom, index, decompress)
         .map(|(_, d, _)| d)
+        .map_err(|e| e.into())
+}
+
+/// Export id `entry`'s data and  information from a `&[u8]` SSB64 ROM buffer
+/// In order to get file information, the file will have to be decompressed
+pub fn file_and_info(rom: &[u8], index: u32)
+    -> Result<(Vec<u8>, ResFileInfo), ResError>
+{
+    get_file_and_info(rom, index)
         .map_err(|e| e.into())
 }
