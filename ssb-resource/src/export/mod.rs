@@ -36,7 +36,9 @@ fn get_triple(rom: &[u8], index: u32, decompress: bool)
 {
     // process the rom into a Ssb64 struct
     let ssb = Ssb64::from_rom(rom)?;
+    println!("{:#?}", ssb);
     let (entry, ptr) = ssb.get_res_tbl_entry(rom, index)?;
+    println!("file @ {:#X}:\n{:#?}", ptr, entry);
     let compressed = entry.is_compressed();
     let (compressed_size, ..) = entry.get_size();
 
@@ -75,8 +77,18 @@ pub fn file(rom: &[u8], index: u32, decompress: bool)
         .map_err(|e| e.into())
 }
 
+/// Export information for file number `index` from a `&[u8] ROM` buffer.
+/// In order to get file information, the file will have to be decompressed.
+pub fn info(rom: &[u8], index: u32)
+    -> Result<ResFileInfo, ResError>
+{
+    get_file_and_info(rom, index)
+        .map( |(_, i)| i)
+        .map_err(|e| e.into())
+}
+
 /// Export id `entry`'s data and  information from a `&[u8]` SSB64 ROM buffer
-/// In order to get file information, the file will have to be decompressed
+/// In order to get file information, the file will have to be decompressed.
 pub fn file_and_info(rom: &[u8], index: u32)
     -> Result<(Vec<u8>, ResFileInfo), ResError>
 {

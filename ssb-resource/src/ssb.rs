@@ -141,7 +141,7 @@ impl ResourceTbl {
         };
         let entry = ResTblEntry::from(entry_data);
         
-        Ok( (entry, entry.calc_ptr(start)) )
+        Ok( (entry, entry.calc_ptr(end)) )
     }
     /// Get a `Option<Vec>` containing the external files that file `id` needs, if
     /// that file requires any external files
@@ -162,8 +162,10 @@ impl ResourceTbl {
         let req_end = req_start + req_byte_len;
 
         let reqs = &rom[req_start..req_end];
+        println!("Req Start: {:#x}; Req End: {:#x}", req_start, req_end);
+        println!("{:?}", reqs);
         // TODO: Size check reqs.len() to ensure 16-bit aligned
-        let mut output: Vec<u16> = Vec::with_capacity(req_byte_len / 2);
+        let mut output = vec![0u16; req_byte_len / 2];
         BE::read_u16_into(reqs, &mut output);
 
         Ok(Some(output))
@@ -182,13 +184,13 @@ pub struct ResTblEntry {
 }
 
 impl ResTblEntry {
-    /// Calculate the ROM pointer for a resource table entry, based on the table start
-    /// offset `table_start`
+    /// Calculate the ROM pointer for a resource table entry, based on the table end
+    /// offset `table_end`
     #[inline]
-    fn calc_ptr(&self, table_start: usize) -> usize {
+    fn calc_ptr(&self, table_end: usize) -> usize {
         let &Self{offset, ..} = self;
         let offset = offset as usize;
-        table_start + offset
+        table_end + offset
     }
     /// Check if the associated data for this entry is vpk0 compressed
     #[inline]
