@@ -8,6 +8,8 @@ use failure::{Error};
 use ssb_resource::{export};
 use path_abs::{PathAbs};
 use std::io::{Read};
+use std::path::{Path};
+use std::num::ParseIntError;
 
 fn main() {
     if let Err(ref e) = run() {
@@ -54,9 +56,6 @@ const F_INFOONLY: &'static str = "info-only";
 fn run() -> Result<(), Error> {
     let matches = cli().get_matches();
 
-    println!("Hello, world!");
-    println!("{:?}", matches);
-
     let mode = match matches.subcommand_name() {
         Some(CMD_EXPORT)   => Mode::Export,
         Some(CMD_COMPLETE) => Mode::Complete,
@@ -77,25 +76,60 @@ fn run() -> Result<(), Error> {
 }
 
 fn export(matches: &ArgMatches) -> Result<(), Error> {
-    let rom_path = matches.value_of(POS_ROM).unwrap();
     let file_idx: u32 = if let Some(idx) = matches.value_of(POS_ENTRY) {
-        if idx.len() > 2 && &idx[0..2] == "0x" {
-            u32::from_str_radix(&idx[2..], 16)?
-        } else { 
-            u32::from_str_radix(idx, 10)?
-        }
-    } else { bail!("No file index provided") };
+        hex_str_to_u32(idx)?
+    } else { 
+        bail!("No file index provided") 
+    };
+    let decompress = !matches.is_present(F_RAW);
+    let file_only  = matches.is_present(F_FILEONLY);
+    let info_only  = matches.is_present(F_INFOONLY);
+    let cvrt_ptrs  = matches.is_present(F_CVRTPTR);
+    let hex_name   = matches.is_present(F_HEXNAME);
 
+    let rom_path = Path::new(matches.value_of(POS_ROM).unwrap());
     let mut rom_file = PathAbs::new(&rom_path)?.into_file()?.read()?;
     let mut rom = Vec::new();
 
     rom_file.read_to_end(&mut rom)?;
 
-    println!("{} - {}", rom_path, file_idx);
+    println!("{:?} - file {}", rom_path, file_idx);
     println!("rom size: {}", rom.len());
+    println!("decompress file: {}", decompress);
+
+    // Generate path to output file (.bin) based on if RENAME flag is present
+    let renamed_output = matches.value_of(F_RENAME);
+    let output_bin_path = if let Some(rename) = renamed_output {
+        rom_path.with_file_name(rename)
+    } else {
+        let name = if hex_name {
+            format!("resource-{:#05X}.bin", file_idx)
+        } else {
+            format!("resource-{:04}.bin", file_idx)
+        };
+        rom_path.with_file_name(name)
+    };
+
+    println!("output file name: {:?}", output_bin_path);
+    /*
+    if info_only {
+        let file_info = export::info(&rom, file_idx)?;
+        println!("{:#?}", file_info);
+    } else if file_only {
+        let file = export::file(&rom, file_idx, decompress)?;
+        println!("Exported File:\n{:#?}", file);
+    } */
 
     Ok(())
 }
+
+fn hex_str_to_u32(value: &str) -> Result<u32, ParseIntError> {
+    if value.len() > 2 && &value[0..2] == "0x" {
+        u32::from_str_radix(&value[2..], 16)
+    } else {
+        u32::from_str_radix(value, 10)
+    }
+} 
 
 fn cli<'a, 'b>() -> App<'a, 'b> {
     let rom_arg = Arg::with_name(POS_ROM)
@@ -181,6 +215,7 @@ fn cli<'a, 'b>() -> App<'a, 'b> {
             entry_arg.clone(),
             file_only_flag.clone(),
             info_only_flag.clone(),
+            convert_pointers_flag.clone(),
             raw_flag.clone(),
             hex_name_flag.clone(),
             rename_flag.clone(),
