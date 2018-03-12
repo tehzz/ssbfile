@@ -4,5 +4,6 @@
 # Reference Files
 SSB.py
 
-# Output / Imput Files
+# Output / Input Files
 *.bin
+*.z64
