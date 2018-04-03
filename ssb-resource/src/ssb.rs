@@ -162,8 +162,8 @@ impl ResourceTbl {
         let req_end = req_start + req_byte_len;
 
         let reqs = &rom[req_start..req_end];
-        println!("Req Start: {:#x}; Req End: {:#x}", req_start, req_end);
-        println!("{:?}", reqs);
+        debug!("Req Start: {:#x} | Req End: {:#x}", req_start, req_end);
+        debug!("Req List:\n{:?}", reqs);
         // TODO: Size check reqs.len() to ensure 16-bit aligned
         let mut output = vec![0u16; req_byte_len / 2];
         BE::read_u16_into(reqs, &mut output);

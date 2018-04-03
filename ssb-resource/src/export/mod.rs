@@ -36,9 +36,9 @@ fn get_triple(rom: &[u8], index: u32, decompress: bool)
 {
     // process the rom into a Ssb64 struct
     let ssb = Ssb64::from_rom(rom)?;
-    println!("{:#?}", ssb);
+    debug!("{:#?}", ssb);
     let (entry, ptr) = ssb.get_res_tbl_entry(rom, index)?;
-    println!("file @ {:#X}:\n{:#?}", ptr, entry);
+    info!("file @ {:#X}:\n{:#?}", ptr, entry);
     let compressed = entry.is_compressed();
     let (compressed_size, ..) = entry.get_size();
 

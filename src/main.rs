@@ -1,12 +1,16 @@
 extern crate clap;
 extern crate path_abs;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate log;
+extern crate simplelog;
 extern crate ssb_resource;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use failure::{Error};
+use log::LevelFilter;
+use simplelog::{CombinedLogger, TermLogger, WriteLogger, Config};
 use ssb_resource::{export};
-use path_abs::{PathAbs};
+use path_abs::{PathAbs, FileWrite};
 use std::io::{Read};
 use std::path::{Path};
 use std::num::ParseIntError;
@@ -54,6 +58,13 @@ const F_FILEONLY: &'static str = "file-only";
 const F_INFOONLY: &'static str = "info-only";
 
 fn run() -> Result<(), Error> {
+    CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Warn, Config::default()).unwrap(),
+            WriteLogger::new(LevelFilter::Debug, Config::default(), FileWrite::create("ssbfile-temp.log")?),
+        ]
+    )?;
+
     let matches = cli().get_matches();
 
     let mode = match matches.subcommand_name() {
@@ -93,9 +104,9 @@ fn export(matches: &ArgMatches) -> Result<(), Error> {
 
     rom_file.read_to_end(&mut rom)?;
 
-    println!("{:?} - file {}", rom_path, file_idx);
-    println!("rom size: {}", rom.len());
-    println!("decompress file: {}", decompress);
+    info!("{:?} - file {}", rom_path, file_idx);
+    info!("rom size: {}", rom.len());
+    info!("decompress file: {}", decompress);
 
     // Generate path to output file (.bin) based on if RENAME flag is present
     let renamed_output = matches.value_of(F_RENAME);
@@ -110,15 +121,15 @@ fn export(matches: &ArgMatches) -> Result<(), Error> {
         rom_path.with_file_name(name)
     };
 
-    println!("output file name: {:?}", output_bin_path);
-    /*
+    debug!("output file name: {:?}", output_bin_path);
+    
     if info_only {
         let file_info = export::info(&rom, file_idx)?;
-        println!("{:#?}", file_info);
+        debug!("{:#?}", file_info);
     } else if file_only {
         let file = export::file(&rom, file_idx, decompress)?;
-        println!("Exported File:\n{:#?}", file);
-    } */
+        debug!("Exported File:\n{:?}", file);
+    } 
 
     Ok(())
 }

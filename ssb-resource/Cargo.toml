@@ -7,3 +7,4 @@ authors = ["tehz"]
 vpk0 = {git = "https://github.com/tehzz/vpk0.git" }
 failure = "0.1.1"
 byteorder = "1.2.1"
+log = "0.4.1"
