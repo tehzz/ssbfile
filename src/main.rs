@@ -87,11 +87,9 @@ fn run() -> Result<(), Error> {
 }
 
 fn export(matches: &ArgMatches) -> Result<(), Error> {
-    let file_idx: u32 = if let Some(idx) = matches.value_of(POS_ENTRY) {
-        hex_str_to_u32(idx)?
-    } else { 
-        bail!("No file index provided") 
-    };
+    let file_idx = matches.value_of(POS_ENTRY)
+        .ok_or(format_err!("No file index provided"))
+        .map(hex_str_to_u32)??;
     let decompress = !matches.is_present(F_RAW);
     let file_only  = matches.is_present(F_FILEONLY);
     let info_only  = matches.is_present(F_INFOONLY);
@@ -110,15 +108,16 @@ fn export(matches: &ArgMatches) -> Result<(), Error> {
 
     // Generate path to output file (.bin) based on if RENAME flag is present
     let renamed_output = matches.value_of(F_RENAME);
-    let output_bin_path = if let Some(rename) = renamed_output {
-        rom_path.with_file_name(rename)
-    } else {
-        let name = if hex_name {
-            format!("resource-{:#05X}.bin", file_idx)
-        } else {
-            format!("resource-{:04}.bin", file_idx)
-        };
-        rom_path.with_file_name(name)
+    let output_bin_path = match renamed_output {
+        Some(rename) => rom_path.with_file_name(rename),
+        None => {
+            let name = if hex_name {
+                format!("resource-{:#05X}.bin", file_idx)
+            } else {
+                format!("resource-{:04}.bin", file_idx)
+            };
+            rom_path.with_file_name(name)
+        }
     };
 
     debug!("output file name: {:?}", output_bin_path);
