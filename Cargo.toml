@@ -1,14 +1,11 @@
 [package]
 name = "ssbfile"
 version = "0.1.0"
-authors = ["tehz"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssb-resource = { path = "ssb-resource" } 
-clap = "2.29.0"
-failure = "0.1.1"
-path_abs = "0.3.8"
-log = "0.4.1"
-simplelog = "0.5.1"
-
-[workspace]
+vpk0 = "0.8"
+structopt = "0.3.25"
+anyhow = "1"

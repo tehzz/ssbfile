@@ -1,9 +1,9 @@
-/target/
-**/*.rs.bk
-
-# Reference Files
-SSB.py
-
 # Output / Input Files
 *.bin
+*.vpk
 *.z64
+
+
+# Added by cargo
+
+/target
